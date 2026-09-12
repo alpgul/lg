@@ -1,6 +1,6 @@
 #!/bin/bash
-# Description: Custom CA Certificate Overlay Fix for webOS
-# Author: Updated for ISRG Root X1/X2 & 2024 Intermediate Certs (E5, E6, R10, R11)
+# Description: Custom CA Certificate Overlay Fix for webOS (Fully Fixed for X1 & X2)
+# Author: Updated for ISRG Root X1/X2, Cross-Signs & 2024 Intermediates (E5, E6, R10, R11)
 
 export STARTUP_SCRIPTS_DIR=/var/lib/webosbrew/init.d
 export CERT_FIX_SCRIPT=${STARTUP_SCRIPTS_DIR}/overlay-letsencrypt-ca-certs-fix
@@ -37,6 +37,21 @@ for cert in isrgrootx1.crt isrg-root-x2.crt isrg-root-x2-cross.crt letsencrypt-e
     grep -qxF "$cert" ${CERT_FIX_DIR}/fixed-ca-certificates.conf || echo "$cert" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
 done
 
+echo "Tüm sertifikaları içeren tek parça Bundle (ca-certificates.crt) oluşturuluyor..."
+cp /etc/ssl/certs/ca-certificates.crt ${CERT_FIX_DIR}/etc_ssl/certs/ca-certificates.crt 2>/dev/null || touch ${CERT_FIX_DIR}/etc_ssl/certs/ca-certificates.crt
+cat ${CERT_FIX_DIR}/usr_share_ca-certificates/*.crt >> ${CERT_FIX_DIR}/etc_ssl/certs/ca-certificates.crt
+
+echo "OpenSSL Hash Symlink'leri manuel üretiliyor..."
+for certfile in ${CERT_FIX_DIR}/usr_share_ca-certificates/*.crt; do
+    if command -v openssl >/dev/null 2>&1; then
+        HASH=$(openssl x509 -hash -noout -in "$certfile" 2>/dev/null)
+        HASH_OLD=$(openssl x509 -subject_hash_old -noout -in "$certfile" 2>/dev/null)
+        
+        [ -n "$HASH" ] && ln -sf "$certfile" "${CERT_FIX_DIR}/etc_ssl/certs/${HASH}.0"
+        [ -n "$HASH_OLD" ] && ln -sf "$certfile" "${CERT_FIX_DIR}/etc_ssl/certs/${HASH_OLD}.0"
+    fi
+done
+
 echo "Açılış (Startup) overlay script'i oluşturuluyor..."
 cat << 'EOF' > ${CERT_FIX_SCRIPT}
 #!/bin/bash
@@ -44,16 +59,22 @@ cat << 'EOF' > ${CERT_FIX_SCRIPT}
 
 CERT_FIX_DIR=/home/certfix-overlay
 
+# Base Bind Mounts
 mount --bind ${CERT_FIX_DIR}/fixed-ca-certificates.conf /etc/ca-certificates.conf
 mount -t overlay overlay -o lowerdir=/etc/ssl,upperdir=${CERT_FIX_DIR}/etc_ssl,workdir=${CERT_FIX_DIR}/work-etc_ssl /etc/ssl
 mount -t overlay overlay -o lowerdir=/usr/share/ca-certificates,upperdir=${CERT_FIX_DIR}/usr_share_ca-certificates,workdir=${CERT_FIX_DIR}/work-usr_share_ca-certificates /usr/share/ca-certificates
+
+# Direct Bundle Bind Mount (cURL & Browser Fix)
+if [ -f "${CERT_FIX_DIR}/etc_ssl/certs/ca-certificates.crt" ]; then
+    mount --bind ${CERT_FIX_DIR}/etc_ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+fi
 
 update-ca-certificates --fresh
 
 if command -v c_rehash >/dev/null 2>&1; then
     c_rehash /etc/ssl/certs
 elif command -v openssl >/dev/null 2>&1; then
-    openssl rehash /etc/ssl/certs
+    openssl rehash /etc/ssl/certs 2>/dev/null || true
 fi
 EOF
 
