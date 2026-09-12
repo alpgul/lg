@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Explicitly remove the old expired X3 certificate from the trust store
-# Download two new LetsEncrypt certificates
+# Download current LetsEncrypt certificates
 # Create a post-boot script to overlay this cert data over the readonly filesystem and reload CA cert config on boot
 # Tam Oct 2021, updates Jan 2020
 # https://github.com/tf318/lg
@@ -47,10 +47,19 @@ if [ ! -f "${CERT_FIX_SCRIPT}" ]; then
         echo "Downloading current LetsEncrypt CA Certificates..."
         echo
 
-        curl -k https://letsencrypt.org/certs/lets-encrypt-r3.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/lets-encrypt-r3.crt
         curl -k https://letsencrypt.org/certs/isrgrootx1.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/isrgrootx1.crt
-        echo "lets-encrypt-r3.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        curl -k https://letsencrypt.org/certs/isrg-root-x2.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/isrg-root-x2.crt
+        curl -k https://letsencrypt.org/certs/2024/e5.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/letsencrypt-e5.crt
+        curl -k https://letsencrypt.org/certs/2024/e6.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/letsencrypt-e6.crt
+        curl -k https://letsencrypt.org/certs/2024/r10.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/letsencrypt-r10.crt
+        curl -k https://letsencrypt.org/certs/2024/r11.pem --output ${CERT_FIX_DIR}/usr_share_ca-certificates/letsencrypt-r11.crt
+
         echo "isrgrootx1.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        echo "isrg-root-x2.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        echo "letsencrypt-e5.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        echo "letsencrypt-e6.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        echo "letsencrypt-r10.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
+        echo "letsencrypt-r11.crt" >> ${CERT_FIX_DIR}/fixed-ca-certificates.conf
 
         echo
         echo "Creating startup certificate overlay script..."
